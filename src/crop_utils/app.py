@@ -51,7 +51,13 @@ _AUTOSAVE_MS          = 30_000   # autosave interval
 _KEY_INITIAL_DELAY_MS = 400      # delay before key-hold repeat begins
 _KEY_REPEAT_MS        = 50       # repeat interval while key held
 _OVERLAY_DEBOUNCE_MS  = 150      # debounce for live spinbox → overlay
+_DUPLICATE_OFFSET_PX  = 10       # pixel offset when duplicating an area
+_SHIFT_MASK           = 0x0001   # Tkinter event.state bit for Shift
+_CTRL_MASK            = 0x0004   # Tkinter event.state bit for Control
 _ARROW_KEYS           = frozenset({"Up", "Down", "Left", "Right"})
+_ARROW_DELTAS: dict[str, tuple[int, int]] = {
+    "Left": (-1, 0), "Right": (1, 0), "Up": (0, -1), "Down": (0, 1),
+}
 
 
 # ---------------------------------------------------------------------------
@@ -596,9 +602,8 @@ class CropApp:
         if not (0 <= self._selected_idx < len(areas)):
             return
         a   = areas[self._selected_idx]
-        off = 10
-        nx  = a.x + off
-        ny  = a.y + off
+        nx  = a.x + _DUPLICATE_OFFSET_PX
+        ny  = a.y + _DUPLICATE_OFFSET_PX
         if self.image is not None:
             nx = min(nx, self.image.width  - a.width)
             ny = min(ny, self.image.height - a.height)
@@ -822,9 +827,9 @@ class CropApp:
             return
         # step multipliers: Shift×10, Ctrl×5 (together → ×50)
         step = 1
-        if event.state & 0x0001:   # Shift
+        if event.state & _SHIFT_MASK:
             step *= 10
-        if event.state & 0x0004:   # Control
+        if event.state & _CTRL_MASK:
             step *= 5
         if key not in self._keys_held:
             self._keys_held[key] = step
@@ -854,12 +859,8 @@ class CropApp:
         if not (0 <= self._selected_idx < len(areas)):
             return
         a = areas[self._selected_idx]
-        dx = dy = 0
-        if key == "Left":  dx = -step
-        elif key == "Right": dx = step
-        elif key == "Up":  dy = -step
-        elif key == "Down":  dy = step
-        nx, ny = a.x + dx, a.y + dy
+        ddx, ddy = _ARROW_DELTAS[key]
+        nx, ny = a.x + ddx * step, a.y + ddy * step
         if self.image is not None:
             nx = max(0, min(nx, self.image.width  - a.width))
             ny = max(0, min(ny, self.image.height - a.height))
